@@ -4,6 +4,7 @@ import json
 import flask_cors
 import threading
 import zipfile
+import re
 from xmlschema import XMLSchema, etree_tostring
 from tqdm import tqdm
 from flask import Flask, request, jsonify
@@ -12,6 +13,7 @@ SAVE_DIR = "data/"
 MAX_RETRIES = 5
 
 PACK_AS_CBZ = True
+SAVE_SEPERATE_FOLDER = True
 CBZ_DIR = "cbz/"
 XSD_FILE = "ComicInfo.xsd"
 
@@ -34,13 +36,14 @@ def preview2download(url):
 
 
 def compressFolder(folder_path, zip_path):
-    with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zipf:
+    with zipfile.ZipFile("./tmp", "w", zipfile.ZIP_DEFLATED) as zipf:
         for root, _, files in os.walk(folder_path):
             for file in files:
                 file_path = os.path.join(root, file)
                 zipf.write(file_path, arcname=os.path.relpath(
                     file_path, folder_path))
     zipf.close()
+    os.rename("./tmp", zip_path)
 
 
 def packAsCbz(gallery_id):
@@ -69,6 +72,13 @@ def packAsCbz(gallery_id):
     xmlFile = f"{SAVE_DIR}/{gallery_id}/ComicInfo.xml"
     with open(xmlFile, "wb") as f:
         f.write(etree_tostring(root, xml_declaration=True, encoding="utf-8"))
+    if SAVE_SEPERATE_FOLDER:
+        title = re.sub(r'[\/:*?"<>|]', '', comicInfo["Title"])
+        folderPath = f"{CBZ_DIR}/{title}"
+        if not os.path.exists(folderPath):
+            os.makedirs(folderPath)
+        compressFolder(f"{SAVE_DIR}/{gallery_id}", f"{folderPath}/{gallery_id}.cbz")
+        return
     compressFolder(f"{SAVE_DIR}/{gallery_id}", f"{CBZ_DIR}/{gallery_id}.cbz")
 
 
