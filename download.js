@@ -2,7 +2,11 @@ javascript: (function () {
     var data = {
     };
     function q(selector) {
-        return document.querySelector(selector).textContent;
+        try {
+            return document.querySelector(selector).textContent;
+        } catch (error) {
+            return "";
+        }
     }
     data["id"] = q("#gallery_id").split('#')[1];
     title = {}; subtitle = {};
