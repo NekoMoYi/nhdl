@@ -17,10 +17,12 @@ SAVE_SEPERATE_FOLDER = True
 CBZ_DIR = "cbz/"
 XSD_FILE = "ComicInfo.xsd"
 
+requestHeaders = {}
+proxies = {}
 
 def download(url, save_path=""):
     filename = url.split("/")[-1]
-    response = requests.get(url, stream=True)
+    response = requests.get(url, stream=True, headers=requestHeaders, proxies=proxies)
     with open(os.path.join(save_path, filename), "wb") as f:
         for data in response.iter_content(1024):
             f.write(data)
@@ -29,8 +31,8 @@ def download(url, save_path=""):
 def preview2download(url):
     filename = url.split("/")[-1]
     domain = url.split("/")[2]
-    subdomain = domain.split(".")[0]
-    url = url.replace(subdomain, subdomain.replace("t", "i"))
+    # subdomain = domain.split(".")[0]
+    # url = url.replace(subdomain, subdomain.replace("t", "i"))
     url = url.replace(filename, filename.replace("t.", "."))
     return url
 
@@ -51,8 +53,9 @@ def packAsCbz(gallery_id):
     with open(f"{SAVE_DIR}/{gallery_id}/info.json", "r", encoding="utf-8") as f:
         data = json.load(f)
     schema = XMLSchema(XSD_FILE)
+    pretty = re.sub(r'\[.*?\]|\(.*?\)', '', data['title']).strip()
     comicInfo = {
-        "Title": data["title"]["pretty"],
+        "Title": pretty,
         "Summary": "",
         "Writer": ",".join(data["artists"]),
         "Genre": ",".join(data["categories"]),
@@ -60,9 +63,7 @@ def packAsCbz(gallery_id):
         "Characters": ",".join(data["characters"]),
         "SeriesGroup": ",".join(data["groups"])
     }
-    if data["subtitle"]["pretty"] != "":
-        comicInfo["Title"] = data["subtitle"]["pretty"]
-    comicInfo["Summary"] = f"{data['title']['before']}{data['title']['pretty']}{data['title']['after']}\n{data['subtitle']['before']}{data['subtitle']['pretty']}{data['subtitle']['after']}"
+    comicInfo["Summary"] = f"{data['title']}\n{data['subtitle']}"
     tags = []
     tags.extend(data["parodies"])
     tags.extend(data["characters"])
@@ -95,7 +96,8 @@ def downloadProcess(data):
             try:
                 download(preview2download(img), gallery_dir)
                 break
-            except:
+            except Exception as e:
+                print(e)
                 continue
     if PACK_AS_CBZ:
         packAsCbz(gallery_id)
@@ -108,6 +110,7 @@ flask_cors.CORS(app)
 @app.route("/", methods=["POST"])
 def download_doujinshi():
     data = request.get_json()
+    data["title"], data["subtitle"] = data["subtitle"], data["title"]
     threading.Thread(target=downloadProcess, args=(data,)).start()
     return jsonify({"status": "ok"})
 
